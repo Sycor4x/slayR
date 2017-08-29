@@ -1,0 +1,32 @@
+graphDiffusionKernel <- function(L, pars){
+	if(!all(rowSums(L)!=0)) stop("User error: L must be the graph Laplacian of the network, which implies that rowSums(L)==0 for all rows.")
+	beta <- pars[names(pars)=="beta"]
+	if(beta <= 0 | beta >= 1) stop(paste0("User error: beta must be in the interval (0, 1). Supplied value of beta=", beta))
+	spectrum <- eigen(L)
+	Q <- exp(-beta/2*spectrum$values)%*%t(spectrum$vectors)
+	return(Q)
+}
+
+GaussianSVMKernel <- function(X, pars){
+	if(!("ln_gamma"%in%names(pars))) stop("For this kernel, must supply named argument 'ln_gamma' in pars.")
+	gamma <- exp(pars[names(pars)=="ln_gamma"])
+	N <- nrow(X)
+	K <- matrix(0, nrow=N, ncol=N)
+	for(i in 1:(N-1)){
+		for(j in (i+1):N){
+			d <- X[i,]-X[j,]
+			K[i,j] <- exp(-d%*%d*gamma)
+			K[j,i] <- K[i,j]
+		}
+	}
+	diag(K) <- 1
+	Q <- kernelFactor(K)
+	return(Q)
+}
+
+kernelFactor <- function(kernel, eps=1e-15){
+	spectrum <- eigen(kernel, symmetric=TRUE)
+	spectrum$values[spectrum$values<eps] <- 0
+	Q <- diag(sqrt(spectrum$values))%*%t(spectrum$vectors)
+	return(Q)
+}
